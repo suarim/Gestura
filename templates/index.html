@@ -1,0 +1,193 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Flask App</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+      * {
+        padding: 0;
+        margin: 0;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background-color: black;
+      }
+      .leftCanvas,
+      .rightCanvas {
+        height: auto;
+        width: 40vw;
+        padding: 20px;
+      }
+      #testImage {
+        height: 65vh;
+        width: 40vw;
+      }
+      h1 {
+        text-align: center;
+        color: white;
+      }
+      h2 {
+        color: white;
+      }
+      video {
+        display: block;
+        margin: 0 auto;
+        border-radius: 5px;
+      }
+      button {
+        display: block;
+        margin: 20px auto;
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+
+      #videoText{
+        color:white;
+      }
+      .window {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="window">
+      <div class="leftCanvas">
+        <h2>Test Image</h2>
+        <img id="testImage" src="/static/start_image.avif" alt="testImage" />
+        <button onclick="generateImage()">Start</button>
+      </div>
+      <div class="rightCanvas">
+        <h2>Detected Objects Video</h2>
+        <video
+          id="webcam"
+          src=""
+          width="100%"
+          height="462.4px"
+          autoplay
+        ></video>
+        <h3 id="videoText"></h3>
+        <button onclick="captureVideoClip()">Capture Video</button>
+      </div>
+    </div>
+
+    <script>
+      let mediaRecorder;
+      let recordedChunks = [];
+      let isCameraStream = true; // To track the current source
+      const videoElement = document.getElementById("webcam");
+
+      function generateImage() {
+        var images = ["apple.jpg", "horse.jpg", "cow.jpg", "orange.jpg", "bird.jpg", "book.jpg"]; // Add your image names
+        var randomIndex = Math.floor(Math.random() * images.length);
+        var imageUrl = "/static/" + images[randomIndex];
+        document.getElementById("testImage").src = imageUrl;
+        console.log(`The url is : ${document.getElementById("testImage").src}`);
+      }
+
+      function captureVideoClip() {
+        if (isCameraStream) {
+          recordedChunks = [];
+          if (mediaRecorder && mediaRecorder.state === "inactive") {
+            mediaRecorder.start();
+            setTimeout(stopRecording, 4000); // Record for 5 seconds
+          }
+        } else {
+          startCameraStream();
+        }
+        isCameraStream = !isCameraStream; // Toggle the state
+      }
+
+      function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+        }
+      }
+
+      function sendVideoToServer(blob) {
+        const formData = new FormData();
+        formData.append("video", blob, "video.webm");
+        const wer = document.getElementById("videoText")
+
+        fetch("/detect_video", {
+          method: "POST",
+          body: formData,
+        })
+          .then((response) => response.text())
+          .then((result) => {
+            var check = document.getElementById("testImage").src;
+            if (result.slice(9, -4) === check.slice(29, -4)) {
+              console.log("Matched");
+              wer.innerText = "Correct"
+              changeToVideoFile("../static/correct.mp4");
+            } else {
+              console.log("Not Matched");
+              wer.innerText = "Incorrect"
+              changeToVideoFile(`../static/${check.slice(29, -4)}.mp4`);
+            }
+          })
+          .catch((error) => {
+            console.error("Error detecting objects:", error);
+          });
+      }
+
+      function changeToVideoFile(src) {
+        // Stop the camera stream if it's running
+        if (videoElement.srcObject) {
+          const tracks = videoElement.srcObject.getTracks();
+          tracks.forEach((track) => track.stop());
+          videoElement.srcObject = null;
+        }
+
+        // Set the video source to the video file
+        videoElement.src = src;
+        videoElement.autoplay = true;
+        videoElement.loop = true;
+        videoElement.play();
+      }
+
+      function startCameraStream() {
+        navigator.mediaDevices
+          .getUserMedia({ video: true })
+          .then(function (stream) {
+            videoElement.srcObject = stream;
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = function (event) {
+              if (event.data.size > 0) {
+                recordedChunks.push(event.data);
+                const blob = new Blob(recordedChunks, {
+                  type: "video/webm",
+                });
+                sendVideoToServer(blob);
+                changeToVideoFile("../static/Loading Screen Effect.mp4")
+              }
+            };
+          })
+          .catch(function (err) {
+            console.log("An error occurred: " + err);
+          });
+      }
+
+      $(document).ready(function () {
+        startCameraStream();
+      });
+
+      
+    </script>
+  </body>
+</html>
