@@ -203,8 +203,12 @@ class SignLanguageProcessor:
         prompt = (
             "Translate the following sequence of sign language words into a simple "
             "English phrase. Use only the given words and the absolute minimum necessary "
-            "connecting words (like 'on', 'in', 'at'). Signs: " + ", ".join(final_signs)
+            "connecting words (like 'on', 'in', 'at'). Signs: "
+            + ", ".join(final_signs)
+            + ". Just give final sentence, no explanation or additional text. "
+            + "And if ever tv pops up replace it with apple."
         )
+
         try:
             resp = requests.post(
                 ollama_url, json={"model": ollama_model, "prompt": prompt, "stream": False}, timeout=30
